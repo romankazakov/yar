@@ -1,9 +1,9 @@
 #!/bin/python
-import urllib
 
 import time
-
 import logging
+from csv import excel
+from csv import register_dialect
 
 from grab.spider import Spider, Task
 from grab.tools.logs import default_logging
@@ -11,22 +11,34 @@ from grab.tools.lxml_tools import get_node_text
 from grab.tools.lxml_tools import find_node_number
 
 import saver
+from saver.csvrowsaver import *
+
 from saver import csvrowsaver
-import csv
-from csv import excel
-from csv import register_dialect
+
+from saver.csvrowsaver import csvrowsaver
 
 class YarDic(excel):
 	delimiter = '\t'
+	lineterminator = '\n'
 
 register_dialect("YarDic", YarDic)
 
+def listrow(dic):
+	return [str(dic['price']),
+	dic['header'],
+	dic['link'],
+	dic['adress'],
+	dic['subway'],
+	dic['about'],
+	dic['owner'],
+	str(dic['time'])]
+
 class YarSpider(Spider):
-	initial_urls = ['https://realty.yandex.ru/search?type=SELL&category=ROOMS&priceMax=1800000&currency=RUR&roomsTotal=2&roomsTotal=3&rgid=417899&metro=200&metro=216&metro=220&metro=235&metro=241&metro=245&metro=250']
+	initial_urls = ['https://realty.yandex.ru/search?type=SELL&category=ROOMS&roomsTotal=2&roomsTotal=3&rgid=417899&metro=200&metro=216&metro=220&metro=235&metro=241&metro=245']
 	base_url = 'https://realty.yandex.ru'
 
 	def prepare(self):
-		self.csvfilesaver = csvrowsave.r('yar.json', ['price','header', 'link', 'adress', 'subway'], 'YarDic')
+		self.csvfilesaver = csvrowsaver.CsvRowSaver('yar.csv', ['price', 'header', 'link', 'adress', 'subway', 'about', 'owner', 'time'], 'YarDic')
 
 	def task_initial(self, grab, task):
 		css_path = "a.b-pager__page"
@@ -55,13 +67,14 @@ class YarSpider(Spider):
 					row['adress'] = adress
 					row['subway'] = subway
 				if 'b-serp-item__owner' == childelems.attrib['class']:
-					row['onwer']=get_node_text(childelems)
+					row['owner'] = get_node_text(childelems)
 			row['time'] = int(time.time())
-
-			self.csvfilesaver.save(row)
-			#dump(obj=row, fp=self.jsonfile, ensure_ascii=False)
+		self.csvfilesaver.save(listrow(row))
+		grab.url.split('=page')
 
 if __name__ == '__main__':
-	default_logging(grab_log='/tmp/grab.log', level=logging.DEBUG, mode='a',propagate_network_logger=False,network_log='/tmp/grab.network.log')
+	default_logging(grab_log='/tmp/grab.log', level=logging.DEBUG, mode='a', propagate_network_logger=False, network_log='/tmp/grab.network.log')
+	#TODO Put initial URL and filename in to constructor.
+	#TODO Add SQL saver.
 	bot = YarSpider()
 	bot.run()
